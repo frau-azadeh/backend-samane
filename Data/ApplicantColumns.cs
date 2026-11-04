@@ -1,0 +1,42 @@
+namespace samane.Data
+{
+    internal static class ApplicantColumns
+    {
+        internal static readonly string[] Names = new[] { "SubjectIndex",
+                                                          "SubjectAmount",
+                                                          "SubjectPaymentMethod",
+                                                          "AddIndex",
+                                                          "RemoveIndex",
+                                                          "HasNewResponsibility",
+                                                          "ResponsibilityName",
+                                                          "ResponsibilityStartDate",
+                                                          "IsInJobDescription",
+                                                          "MissingJobDescriptionReason",
+                                                          "ProposedIndexName",
+                                                          "IsMeasurable",
+                                                          "RelatedGoal",
+                                                          "MeasurementTypeCode",
+                                                          "ActivityCriticalityReason",
+                                                          "HasExistingOverlap",
+                                                          "OverlapJustification",
+                                                          "ResultControlCode",
+                                                          "DependentFactors",
+                                                          "RemovalIndexName",
+                                                          "RemovalUnsupportedGoal",
+                                                          "RemovalJobDutyRemoved",
+                                                          "RemovalNoControl",
+                                                          "RemovalNotCritical",
+                                                          "AmountResponsibilityMismatch",
+                                                          "AmountWeightMismatch",
+                                                          "AmountComplexityIncreased",
+                                                          "AmountDescription",
+                                                          "ExistingIndexesJson",
+                                                          "ExpectedTotalAmount",
+                                                          "PaymentMethodDescription",
+                                                          "OrganizationalValue",
+                                                          "ApplyToSimilarJobs",
+                                                          "SimilarJobsDifference",
+                                                          "ApplicantConfirmed",
+                                                          "ConfirmationText" };
+    }
+}

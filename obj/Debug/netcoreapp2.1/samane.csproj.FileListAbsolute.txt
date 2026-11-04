@@ -1,0 +1,16 @@
+C:\Users\a.sharifisoltani\source\repos\samane\samane\bin\Debug\netcoreapp2.1\wwwroot\settings\ApIBaseUrl.txt
+C:\Users\a.sharifisoltani\source\repos\samane\samane\bin\Debug\netcoreapp2.1\wwwroot\settings\CorseOrigins.txt
+C:\Users\a.sharifisoltani\source\repos\samane\samane\bin\Debug\netcoreapp2.1\samane.deps.json
+C:\Users\a.sharifisoltani\source\repos\samane\samane\bin\Debug\netcoreapp2.1\samane.runtimeconfig.json
+C:\Users\a.sharifisoltani\source\repos\samane\samane\bin\Debug\netcoreapp2.1\samane.runtimeconfig.dev.json
+C:\Users\a.sharifisoltani\source\repos\samane\samane\bin\Debug\netcoreapp2.1\samane.dll
+C:\Users\a.sharifisoltani\source\repos\samane\samane\bin\Debug\netcoreapp2.1\samane.pdb
+C:\Users\a.sharifisoltani\source\repos\samane\samane\obj\Debug\netcoreapp2.1\samane.csprojAssemblyReference.cache
+C:\Users\a.sharifisoltani\source\repos\samane\samane\obj\Debug\netcoreapp2.1\samane.csproj.CoreCompileInputs.cache
+C:\Users\a.sharifisoltani\source\repos\samane\samane\obj\Debug\netcoreapp2.1\samane.RazorAssemblyInfo.cache
+C:\Users\a.sharifisoltani\source\repos\samane\samane\obj\Debug\netcoreapp2.1\samane.RazorAssemblyInfo.cs
+C:\Users\a.sharifisoltani\source\repos\samane\samane\obj\Debug\netcoreapp2.1\samane.AssemblyInfoInputs.cache
+C:\Users\a.sharifisoltani\source\repos\samane\samane\obj\Debug\netcoreapp2.1\samane.AssemblyInfo.cs
+C:\Users\a.sharifisoltani\source\repos\samane\samane\obj\Debug\netcoreapp2.1\samane.RazorTargetAssemblyInfo.cache
+C:\Users\a.sharifisoltani\source\repos\samane\samane\obj\Debug\netcoreapp2.1\samane.dll
+C:\Users\a.sharifisoltani\source\repos\samane\samane\obj\Debug\netcoreapp2.1\samane.pdb
