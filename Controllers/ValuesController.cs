@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -30,14 +30,14 @@ namespace samane.Controllers
         {
         }
 
-        // PUT api/values/5
-        [HttpPut("{id}")]
+        // POST api/values/5/update
+        [HttpPost("{id}/update")]
         public void Put(int id, [FromBody] string value)
         {
         }
 
-        // DELETE api/values/5
-        [HttpDelete("{id}")]
+        // POST api/values/5/delete
+        [HttpPost("{id}/delete")]
         public void Delete(int id)
         {
         }

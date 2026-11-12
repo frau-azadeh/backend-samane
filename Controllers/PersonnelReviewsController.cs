@@ -17,6 +17,18 @@ namespace samane.Controllers
         [HttpGet]
         public async Task<IActionResult> List([FromQuery] ReviewQuery query,
                                               CancellationToken ct) => Ok(await service.ListAsync(query, ct));
+        [HttpPost("export-page"), RequestSizeLimit(4 * 1024 * 1024)]
+        public async Task<IActionResult> ExportPage([FromBody] ExportQuery input, CancellationToken ct)
+        {
+            Response.Headers["Cache-Control"] = "no-store";
+            return Ok(await service.ExportPageAsync(input, ct));
+        }
+        [HttpPost("search"), RequestSizeLimit(64 * 1024)]
+        public async Task<IActionResult> Search([FromBody] ReviewQuery query, CancellationToken ct)
+        {
+            Response.Headers["Cache-Control"] = "no-store";
+            return Ok(await service.ListAsync(query, ct));
+        }
         [HttpGet("{id:long}")]
         public async Task<IActionResult> Get(long id,
                                              CancellationToken ct) => Ok(await service.GetAsync(id, ct));
@@ -26,13 +38,13 @@ namespace samane.Controllers
             var id = await service.CreateAsync(input, ct);
             return Created("api/personnel-reviews/" + id, new { id });
         }
-        [HttpPut("{id:long}")]
+        [HttpPost("{id:long}/update")]
         public async Task<IActionResult> Update(long id, [FromBody] ReviewInput input, CancellationToken ct)
         {
             await service.UpdateAsync(id, input, ct);
             return NoContent();
         }
-        [HttpDelete("{id:long}")]
+        [HttpPost("{id:long}/delete")]
         public async Task<IActionResult> Delete(long id, [FromBody] VersionInput input, CancellationToken ct)
         {
             await service.DeleteAsync(id, input.Version, ct);

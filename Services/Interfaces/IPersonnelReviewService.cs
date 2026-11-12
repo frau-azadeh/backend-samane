@@ -6,6 +6,7 @@ namespace samane.Services.Interfaces
 {
     public interface IPersonnelReviewService
     {
+        Task<object> ExportPageAsync(ExportQuery query, CancellationToken ct);
         Task<PageResult<ReviewRow>> ListAsync(ReviewQuery query, CancellationToken ct);
         Task<IDictionary<string, object>> GetAsync(long id, CancellationToken ct);
         Task<string> CreateAsync(ReviewInput input, CancellationToken ct);

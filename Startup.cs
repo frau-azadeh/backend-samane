@@ -28,6 +28,7 @@ namespace samane
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddHttpContextAccessor();
+            services.AddScoped<samane.Services.Interfaces.IPersonnelDirectoryService, samane.Services.Implementation.PersonnelDirectoryService>();
             services.AddMemoryCache();
             services.AddScoped<samane.Services.Interfaces.IDevelopmentSessionService,
                                samane.Services.Implementation.DevelopmentSessionService>();
@@ -36,15 +37,16 @@ namespace samane
             services.AddScoped<samane.Services.Interfaces.IGridPreferenceService,
                                samane.Services.Implementation.GridPreferenceService>();
             services.AddScoped<samane.Services.Interfaces.IApplicantProfileResolver,
-                               samane.Services.Implementation.ClaimsApplicantProfileResolver>();
+                               samane.Services.Implementation.SqlApplicantProfileResolver>();
             services.AddScoped<samane.Security.ICurrentActor, samane.Security.CurrentActor>();
             services.AddSingleton<samane.Data.ISqlConnectionFactory, samane.Data.SqlConnectionFactory>();
             services.AddScoped<samane.Services.Interfaces.IPersonnelReviewService,
                                samane.Services.Implementation.PersonnelReviewService>();
+            var cookieScheme = Configuration["Authentication:CookieScheme"] ??
+                Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults.AuthenticationScheme;
             services
-                .AddAuthentication(Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationDefaults
-                                       .AuthenticationScheme)
-                .AddCookie(options =>
+                .AddAuthentication(cookieScheme)
+                .AddCookie(cookieScheme, options =>
                            {
                                options.Events.OnRedirectToLogin = c =>
                                {
@@ -86,7 +88,17 @@ namespace samane
                             context.Response.Headers["Cache-Control"] = "no-store";
                         await next();
                     });
-            app.UseStaticFiles();
+            app.UseStaticFiles(new StaticFileOptions
+            {
+                OnPrepareResponse = context =>
+                {
+                    // Stable filenames and runtime settings must not retain an old deployment.
+                    var name = context.File.Name;
+                    if (context.Context.Request.Path.StartsWithSegments("/settings") ||
+                        name == "config.js" || name == "personnel-review.js" || name == "samaneh-embed.js")
+                        context.Context.Response.Headers["Cache-Control"] = "no-store";
+                }
+            });
             // HTTPS termination/bindings are configured by the deployment host.
             app.UseMvc();
         }

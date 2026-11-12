@@ -6,6 +6,7 @@ namespace samane.Services.Interfaces
     public interface IDevelopmentSessionService
     {
         Task<ClaimsPrincipal> AuthenticateAsync(string login, string password, CancellationToken ct);
+        Task<ClaimsPrincipal> AuthenticateUserIdAsync(string userId, CancellationToken ct);
         Task CheckDatabaseAsync(CancellationToken ct);
     }
 }

@@ -16,12 +16,22 @@ namespace samane.Configuration
         {
             get {
                 var value = File.ReadAllText(Path.Combine(directory, "ApIBaseUrl.txt")).Trim().Trim('\uFEFF');
+                // Root-relative URLs follow the frontend host and support IIS virtual paths.
+                if (value.StartsWith("/", StringComparison.Ordinal) &&
+                    !value.StartsWith("//", StringComparison.Ordinal) &&
+                    value.IndexOfAny(new[] { '?', '#', '\\' }) < 0)
+                {
+                    Uri relative;
+                    if (!Uri.TryCreate(value, UriKind.Relative, out relative))
+                        throw new InvalidDataException("Invalid relative API base URL.");
+                    return value == "/" ? "/" : value.TrimEnd('/');
+                }
                 Uri uri;
                 if (!Uri.TryCreate(value, UriKind.Absolute, out uri) ||
                     (uri.Scheme != "http" && uri.Scheme != "https") || !string.IsNullOrEmpty(uri.Query) ||
                     !string.IsNullOrEmpty(uri.Fragment) || !string.IsNullOrEmpty(uri.UserInfo))
                     throw new InvalidDataException(
-                        "ApIBaseUrl.txt must contain an absolute HTTP(S) base URL " +
+                        "ApIBaseUrl.txt must contain a root-relative or absolute HTTP(S) base URL " +
                         "without query, fragment or credentials.");
                 return value.TrimEnd('/');
             }

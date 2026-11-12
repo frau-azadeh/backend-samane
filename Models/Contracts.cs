@@ -18,6 +18,8 @@ namespace samane.Models
         public Dictionary<string, string> Filters { get; set; } = new Dictionary<string, string>();
         public string Sort { get; set; } = "createdAt";
         public bool Desc { get; set; } = true;
+        // Prefix is the indexed default; contains is an explicit, potentially expensive option.
+        public string TextMatch { get; set; } = "prefix";
     }
     public class PageResult<T>
     {

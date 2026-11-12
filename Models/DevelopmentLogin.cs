@@ -6,7 +6,7 @@ namespace samane.Models
     {
         [Required, StringLength(256)]
         public string Login { get; set; }
-        [Required, StringLength(1000)]
+        [Required, StringLength(1024)]
         public string Password { get; set; }
     }
     internal class DevelopmentAccount

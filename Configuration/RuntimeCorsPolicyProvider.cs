@@ -22,7 +22,7 @@ namespace samane.Configuration
             {
                 var origins = settings.ReadOrigins();
                 if (origins.Length > 0)
-                    builder.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+                    builder.WithOrigins(origins).AllowAnyHeader().WithMethods("GET", "POST", "OPTIONS").AllowCredentials();
             }
             catch (Exception exception)
             {

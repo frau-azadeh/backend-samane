@@ -8,10 +8,11 @@ namespace samane.Data
     }
     public class SqlConnectionFactory : ISqlConnectionFactory
     {
-        private readonly string connectionString;
+        private readonly IConfiguration config;
         public SqlConnectionFactory(IConfiguration config)
         {
-            connectionString = config.GetConnectionString("PersonnelReview");
+            this.config = config;
+            var connectionString = config.GetConnectionString("PersonnelReview");
             if (string.IsNullOrWhiteSpace(connectionString))
                 throw new System.InvalidOperationException("ConnectionStrings:PersonnelReview is required.");
             var settings = new SqlConnectionStringBuilder(connectionString);
@@ -22,7 +23,7 @@ namespace samane.Data
         }
         public SqlConnection Create()
         {
-            return new SqlConnection(connectionString);
+            return new SqlConnection(config.GetConnectionString("PersonnelReview"));
         }
     }
 }

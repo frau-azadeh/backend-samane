@@ -14,7 +14,7 @@ using samane.Security;
 using samane.Services.Interfaces;
 namespace samane.Services.Implementation
 {
-    public class PersonnelReviewService : IPersonnelReviewService
+    public partial class PersonnelReviewService : IPersonnelReviewService
     {
         private readonly ISqlConnectionFactory factory;
         private readonly ICurrentActor actor;
@@ -49,7 +49,7 @@ namespace samane.Services.Implementation
         }
         private string Scope => actor.Owner || actor.Management ? "1=1"
                                 : actor.Evaluator
-                                    ? "(PRR_StatusCode=3 OR PRR_EvaluationManagerOpinion IS NOT NULL)"
+                                    ? "(PRR_ApplicantUserId_Fk=@actor OR PRR_StatusCode=3 OR PRR_EvaluationManagerOpinion IS NOT NULL)"
                                     : "PRR_ApplicantUserId_Fk=@actor";
         private void AddActorParameter(SqlCommand cmd)
         {
@@ -73,19 +73,33 @@ namespace samane.Services.Implementation
             var numbers = new Dictionary<string, string> { { "id", "PRR_Id" },
                 { "reviewRoundNo", "PRR_ReviewRoundNo" }, { "statusCode", "PRR_StatusCode" },
                 { "meetingTypeCode", "PRR_MeetingTypeCode" }, { "applicantDecisionCode", "PRR_ApplicantDecisionCode" } };
+            var display = new Dictionary<string,string>(text);
+            foreach (var pair in numbers) display[pair.Key] = pair.Value;
+            display["statusCode"] = "CASE PRR_StatusCode WHEN 1 THEN N'ثبت اولیه' WHEN 2 THEN N'در حال بررسی' WHEN 3 THEN N'در انتظار مدیر ارزیابی' WHEN 4 THEN N'بسته شد' END";
+            display["meetingTypeCode"] = "CASE PRR_MeetingTypeCode WHEN 1 THEN N'حضوری' WHEN 2 THEN N'تلفنی' END";
+            display["applicantDecisionCode"] = "CASE PRR_ApplicantDecisionCode WHEN 1 THEN N'مورد تأیید است' WHEN 2 THEN N'بررسی مجدد' END";
+            display["subjects"] = "STUFF(CASE WHEN PRR_SubjectIndex=1 THEN N'، شاخص عملکرد' ELSE N'' END + CASE WHEN PRR_SubjectAmount=1 THEN N'، مبلغ پرداختی' ELSE N'' END + CASE WHEN PRR_SubjectPaymentMethod=1 THEN N'، نحوه پرداخت' ELSE N'' END,1,2,N'')";
+            display["createdAt"] = "FORMAT(DATEADD(minute,210,PRR_CreatedAt),'yyyy/MM/dd HH:mm','fa-IR')";
+            display["meetingDate"] = "FORMAT(PRR_MeetingDate,'yyyy/MM/dd','fa-IR')";
+            display["meetingTime"] = "CONVERT(nvarchar(8),PRR_MeetingTime,108)";
+            var numericDisplay = new HashSet<string> { "id", "reviewRoundNo" };
             if (q.Filters == null) return parameters;
             if (q.Filters.Count > 30) throw new ApiException(400, "تعداد فیلترها نامعتبر است");
             foreach (var f in q.Filters) {
                 var value = f.Value?.Trim();
                 if (string.IsNullOrEmpty(value)) continue;
+                if (samane.Data.DisplaySearch.Add(f.Key,value,display,numericDisplay,parameters,ref predicate)) continue;
+                value = samane.Data.DisplaySearch.Normalize(value);
                 if (value.Length > 100) throw new ApiException(400, "طول فیلتر بیش از حد مجاز است");
                 var name = "@filter" + parameters.Count;
                 string column;
                 if (text.TryGetValue(f.Key, out column)) {
-                    // Contains matching: find the term anywhere, while escaping SQL LIKE metacharacters.
+                    if (q.TextMatch == "contains" && value.Length < 2)
+                        throw new ApiException(400, "جستجوی شامل متن حداقل دو نویسه نیاز دارد");
+                    // Prefix by default; contains is explicit. Escape LIKE metacharacters.
                     predicate += " AND (" + column + ") LIKE " + name + " ESCAPE '~'";
                     parameters.Add(new SqlParameter(name, SqlDbType.NVarChar, 210) { Value =
-                        "%" + value.Replace("~", "~~").Replace("%", "~%").Replace("_", "~_").Replace("[", "~[") + "%" });
+                        (q.TextMatch == "contains" ? "%" : "") + value.Replace("~", "~~").Replace("%", "~%").Replace("_", "~_").Replace("[", "~[") + "%" });
                 } else if (numbers.TryGetValue(f.Key, out column)) {
                     long n;
                     if (!long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out n) || (n < 1 && f.Key != "id" && f.Key != "reviewRoundNo") ||
@@ -93,11 +107,6 @@ namespace samane.Services.Implementation
                         ((f.Key == "meetingTypeCode" || f.Key == "applicantDecisionCode") && n > 2) ||
                         (f.Key == "reviewRoundNo" && n > int.MaxValue))
                         throw new ApiException(400, "فیلتر عددی نامعتبر است");
-                    if (f.Key == "id" || f.Key == "reviewRoundNo") {
-                        predicate += " AND CONVERT(nvarchar(20)," + column + ") LIKE " + name;
-                        parameters.Add(new SqlParameter(name, SqlDbType.NVarChar, 102) { Value = "%" + value + "%" });
-                        continue;
-                    }
                     predicate += " AND " + column + "=" + name;
                     parameters.Add(new SqlParameter(name, f.Key == "id" ? SqlDbType.BigInt :
                         f.Key == "reviewRoundNo" ? SqlDbType.Int : SqlDbType.TinyInt) { Value = n });
@@ -117,10 +126,17 @@ namespace samane.Services.Implementation
                 } else if (f.Key == "subjects" && new[] { "subjectIndex", "subjectAmount", "subjectPaymentMethod" }.Contains(value)) {
                     predicate += " AND PRR_" + char.ToUpperInvariant(value[0]) + value.Substring(1) + "=1";
                 } else if (f.Key == "meetingTime") {
-                    if (!System.Text.RegularExpressions.Regex.IsMatch(value, @"\A[0-9:]{1,8}\z"))
-                        throw new ApiException(400, "ساعت نامعتبر است");
-                    predicate += " AND CONVERT(char(8),PRR_MeetingTime,108) LIKE " + name;
-                    parameters.Add(new SqlParameter(name, SqlDbType.VarChar, 10) { Value = "%" + value + "%" });
+                    TimeSpan time;
+                    if (!TimeSpan.TryParseExact(value, new[] { @"hh\:mm", @"hh\:mm\:ss" }, CultureInfo.InvariantCulture, out time) || time.TotalHours >= 24)
+                        throw new ApiException(400, "ساعت را کامل مانند 09:30 وارد کنید");
+                    predicate += " AND PRR_MeetingTime >= " + name;
+                    parameters.Add(new SqlParameter(name, SqlDbType.Time) { Value = time });
+                    var endTime = time.Add(TimeSpan.FromSeconds(value.Length == 5 ? 60 : 1));
+                    if (endTime.TotalDays < 1) {
+                        var endName = "@filter" + parameters.Count;
+                        predicate += " AND PRR_MeetingTime < " + endName;
+                        parameters.Add(new SqlParameter(endName, SqlDbType.Time) { Value = endTime });
+                    }
                 } else throw new ApiException(400, "ستون فیلتر مجاز نیست");
             }
             foreach (var field in new[] { "createdAt", "meetingDate" }) {
@@ -131,8 +147,12 @@ namespace samane.Services.Implementation
             }
             return parameters;
         }
-        public async Task<PageResult<ReviewRow>> ListAsync(ReviewQuery q, CancellationToken ct)
+        private static void ValidateQuery(ReviewQuery q)
         {
+            if (q == null) throw new ApiException(400, "درخواست فهرست نامعتبر است");
+            if (q.TextMatch != "prefix" && q.TextMatch != "contains") throw new ApiException(400, "روش جستجو نامعتبر است");
+            if (q.Search != null && q.Search.Length > 100) throw new ApiException(400, "متن جستجو طولانی است");
+            if (q.Status.HasValue && (q.Status < 1 || q.Status > 4)) throw new ApiException(400, "وضعیت نامعتبر است");
             // One scalar query parameter avoids Dictionary model-binding differences across hosts.
             if (!string.IsNullOrWhiteSpace(q.FiltersJson)) {
                 if (q.FiltersJson.Length > 6000) throw new ApiException(400, "حجم فیلتر نامعتبر است");
@@ -143,6 +163,10 @@ namespace samane.Services.Implementation
                     q.Filters = json.Properties().ToDictionary(p => p.Name, p => (string)p.Value);
                 } catch (JsonException) { throw new ApiException(400, "ساختار فیلتر نامعتبر است"); }
             }
+        }
+        public async Task<PageResult<ReviewRow>> ListAsync(ReviewQuery q, CancellationToken ct)
+        {
+            ValidateQuery(q);
             string sort;
             if (!Sorts.TryGetValue(q.Sort ?? "", out sort))
                 throw new ApiException(400, "ستون مرتب‌سازی مجاز نیست");
@@ -157,8 +181,8 @@ namespace samane.Services.Implementation
             var columns =
                 "PRR_Id,PRR_ApplicantFullName,PRR_JobTitle,PRR_DepartmentName,PRR_CreatedAt,PRR_StatusCode,PRR_" +
                 "SubjectIndex,PRR_SubjectAmount,PRR_SubjectPaymentMethod,PRR_MeetingTypeCode,PRR_MeetingDate," +
-                "PRR_MeetingTime,PRR_MeetingLocation,PRR_InitialReview,CASE WHEN PRR_FinalPublishedAt IS NOT " +
-                "NULL THEN PRR_FinalResult ELSE NULL END AS " +
+                "PRR_MeetingTime,PRR_MeetingLocation,LEFT(PRR_InitialReview,500) AS PRR_InitialReview,CASE WHEN PRR_FinalPublishedAt IS NOT " +
+                "NULL THEN LEFT(PRR_FinalResult,500) ELSE NULL END AS " +
                 "PRR_FinalResult,PRR_ApplicantDecisionCode,PRR_ReviewRoundNo,PRR_Version,PRR_ApplicantUserId_" +
                 "Fk,PRR_FinalPublishedAt";
             columns += "," +
@@ -191,7 +215,7 @@ namespace samane.Services.Implementation
                         cmd, "@search", SqlDbType.NVarChar,
                         string.IsNullOrEmpty(search)
                             ? null
-                            : "%" +
+                            : (q.TextMatch == "contains" ? "%" : "") +
                                   search.Replace("~", "~~").Replace("%", "~%").Replace("_", "~_").Replace(
                                       "[", "~[") +
                                   "%",
@@ -313,24 +337,8 @@ namespace samane.Services.Implementation
             {
                 await c.OpenAsync(ct);
                 var d = await ReadAuthorizedAsync(c, id, ct);
-                var status = (byte)d["StatusCode"];
-                d["AllowedActions"] =
-                    GetAllowedActions((string)d["ApplicantUserId_Fk"], status,
-                                      (DateTime?)d["FinalPublishedAt"], (byte?)d["ApplicantDecisionCode"]);
-                d["Id"] = id.ToString();
-                d["Version"] = Convert.ToBase64String((byte[])d["Version"]);
-                if (!actor.Owner && !actor.Evaluator && !actor.Management)
-                {
-                    foreach (var k in new[] { "OwnerOpinion", "ManagementOpinion", "EvaluationManagerOpinion",
-                                              "HistoryJson" })
-                        d.Remove(k);
-                }
-                else if (actor.Management)
-                    d.Remove("ManagementOpinion");
-                if (d["FinalPublishedAt"] == null && !actor.Owner && !actor.Evaluator && !actor.Management)
-                    d["FinalResult"] = null;
-                return d.ToDictionary(k => char.ToLowerInvariant(k.Key[0]) + k.Key.Substring(1),
-                                      k => k.Value);
+                return PublicDetail(d, true);
+
             }
         }
         private static byte[] ParseVersion(string v)
@@ -394,26 +402,11 @@ namespace samane.Services.Implementation
         private void AppendHistory(Dictionary<string, object> d, Dictionary<string, object> changes,
                                    string action, string text = null)
         {
-            var h = JArray.Parse((string)d["HistoryJson"]);
-            h.Add(JObject.FromObject(
-                new
-                {
-                    action,
-                    actorUserId = actor.Id,
-                    atUtc = DateTime.UtcNow,
-                    oldStatus = d["StatusCode"],
-                    newStatus = changes.ContainsKey("StatusCode") ? changes["StatusCode"] : d["StatusCode"],
-                    reviewRoundNo = d["ReviewRoundNo"],
-                    text,
-                    changes,
-                    snapshot = new[] { "StatusCode", "FinalResult", "FinalPublishedAt",
-                                         "ApplicantDecisionCode", "ApplicantDecisionDescription",
-                                         "OwnerOpinion", "ManagementOpinion", "EvaluationManagerOpinion",
-                                         "InitialReview", "MeetingDate", "MeetingTime", "MeetingLocation" }
-                                     .ToDictionary(k => k, k => d[k])
-                }));
+            var h = JArray.Parse((string)d["HistoryJson"] ?? "[]");
+            h.Add(ReviewHistory.CreateEntry(d, changes, action, actor.Id, actor.Name, text));
             changes["HistoryJson"] = h.ToString(Formatting.None);
         }
+
         private async Task MutateAsync(long id, string version, string action,
                                        Func<Dictionary<string, object>, Dictionary<string, object>> change,
                                        CancellationToken ct, string text = null)
@@ -481,6 +474,7 @@ namespace samane.Services.Implementation
                                d =>
                                {
                                    var v = ApplicantValues(input);
+                                   foreach (var field in ReviewListFields.Build(input.ListFields, actor, d)) v[field.Key] = field.Value;
                                    v["ConfirmedAt"] = DateTime.UtcNow;
                                    return v;
                                },
@@ -491,17 +485,16 @@ namespace samane.Services.Implementation
             ReviewValidation.Check(input);
             var v = ApplicantValues(input);
             v["ApplicantUserId_Fk"] = actor.Id;
-            var profile = profileResolver.Resolve();
+            var profile = await profileResolver.ResolveAsync(ct);
             v["ApplicantFullName"] = profile.FullName;
             v["JobTitle"] = profile.JobTitle;
             v["DepartmentName"] = profile.DepartmentName;
+            foreach (var field in ReviewListFields.Build(input.ListFields, actor)) v[field.Key] = field.Value;
             v["CreatedByUserId_Fk"] = actor.Id;
             v["ConfirmedAt"] = DateTime.UtcNow;
             v["HistoryJson"] = JsonConvert.SerializeObject(
                 new[] { new { action = "create", actorUserId = actor.Id, atUtc = DateTime.UtcNow,
-                              oldStatus = (byte?)null, newStatus = (byte)1, reviewRoundNo = 1 } });
-            // Resolve JobTitle/Department and organization references using your host's existing employee
-            // service before insert.
+                              oldStatus = (byte?)null, newStatus = v.ContainsKey("StatusCode") ? v["StatusCode"] : (object)(byte)1, reviewRoundNo = v.ContainsKey("ReviewRoundNo") ? v["ReviewRoundNo"] : (object)1 } });
             using (var c = factory.Create())
             {
                 await c.OpenAsync(ct);

@@ -1,8 +1,10 @@
 using System;
+using Newtonsoft.Json.Linq;
 namespace samane.Models
 {
     public class ReviewInput
     {
+        public JObject ListFields { get; set; }
         public string Version { get; set; }
         public bool SubjectIndex { get; set; }
         public bool SubjectAmount { get; set; }

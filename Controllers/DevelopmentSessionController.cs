@@ -11,6 +11,7 @@ using samane.Models;
 using samane.Services.Interfaces;
 namespace samane.Controllers
 {
+    public class DevelopmentUserInput { [System.ComponentModel.DataAnnotations.Required, System.ComponentModel.DataAnnotations.StringLength(450)] public string UserId { get; set; } }
     [ApiController, Route("api/development-session")]
     public class DevelopmentSessionController : ControllerBase
     {
@@ -24,6 +25,7 @@ namespace samane.Controllers
             this.config = config;
             this.service = service;
         }
+        private string CookieScheme => config["Authentication:CookieScheme"] ?? CookieAuthenticationDefaults.AuthenticationScheme;
         private bool Enabled => env.IsDevelopment() && config.GetValue<bool>("DevelopmentAuth:Enabled");
         [AllowAnonymous, HttpGet("database")]
         public async Task<IActionResult> Database(CancellationToken ct)
@@ -36,25 +38,31 @@ namespace samane.Controllers
         [AllowAnonymous, HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] DevelopmentLoginInput input, CancellationToken ct)
         {
-            if (!Enabled)
-                return NotFound();
             if (Request.Headers["X-Requested-With"] != "PersonnelReview")
                 return BadRequest();
             var principal = await service.AuthenticateAsync(input.Login, input.Password, ct);
             await HttpContext.SignInAsync(
-                CookieAuthenticationDefaults.AuthenticationScheme, principal,
+                CookieScheme, principal,
                 new AuthenticationProperties { IsPersistent = false,
                                                ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(30) });
+            return Ok(new { signedIn = true });
+        }
+        [AllowAnonymous, HttpPost("user-id")]
+        public async Task<IActionResult> UserId([FromBody] DevelopmentUserInput input, CancellationToken ct)
+        {
+            if (!Enabled) return NotFound();
+            if (Request.Headers["X-Requested-With"] != "PersonnelReview") return BadRequest();
+            var principal = await service.AuthenticateUserIdAsync(input.UserId, ct);
+            await HttpContext.SignInAsync(CookieScheme, principal,
+                new AuthenticationProperties { IsPersistent = false, ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(30) });
             return Ok(new { signedIn = true });
         }
         [Authorize, HttpPost("logout")]
         public async Task<IActionResult> Logout()
         {
-            if (!Enabled)
-                return NotFound();
             if (Request.Headers["X-Requested-With"] != "PersonnelReview")
                 return BadRequest();
-            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            await HttpContext.SignOutAsync(CookieScheme);
             return NoContent();
         }
     }

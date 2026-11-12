@@ -1,24 +1,26 @@
-using Microsoft.AspNetCore.Http;
+using System.Threading;
+using System.Threading.Tasks;
+using samane.Data;
 using samane.Security;
 using samane.Services.Interfaces;
+
 namespace samane.Services.Implementation
 {
-    // Replace this adapter with joins to your host's employee/job tables when their full schema is available.
+    // Retain the old filename/type so copying this release over the previous project
+    // overwrites the obsolete synchronous implementation rather than leaving it behind.
+    // Both registrations now use the same database-backed profile lookup.
     public class ClaimsApplicantProfileResolver : IApplicantProfileResolver
     {
-        private readonly IHttpContextAccessor context;
-        private readonly ICurrentActor actor;
-        public ClaimsApplicantProfileResolver(IHttpContextAccessor context, ICurrentActor actor)
+        private readonly SqlApplicantProfileResolver resolver;
+
+        public ClaimsApplicantProfileResolver(ISqlConnectionFactory factory, ICurrentActor actor)
         {
-            this.context = context;
-            this.actor = actor;
+            resolver = new SqlApplicantProfileResolver(factory, actor);
         }
-        public ApplicantProfile Resolve()
+
+        public Task<ApplicantProfile> ResolveAsync(CancellationToken ct)
         {
-            var user = context.HttpContext.User;
-            return new ApplicantProfile { FullName = actor.Name,
-                                          JobTitle = user.FindFirst("job_title")?.Value,
-                                          DepartmentName = user.FindFirst("department_name")?.Value };
+            return resolver.ResolveAsync(ct);
         }
     }
 }

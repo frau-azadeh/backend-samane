@@ -1,3 +1,5 @@
+using System.Threading;
+using System.Threading.Tasks;
 namespace samane.Services.Interfaces
 {
     public class ApplicantProfile
@@ -8,6 +10,6 @@ namespace samane.Services.Interfaces
     }
     public interface IApplicantProfileResolver
     {
-        ApplicantProfile Resolve();
+        Task<ApplicantProfile> ResolveAsync(CancellationToken ct);
     }
 }
